@@ -1,0 +1,43 @@
+name: Block mode test (fork only)
+on:
+  push:
+    branches: [test/block-mode]
+permissions:
+  contents: read
+jobs:
+  version-dry:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner (Block outbound calls not on the list)
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            registry.npmjs.org:443
+            fulcio.sigstore.dev:443
+            rekor.sigstore.dev:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm install -g npm@12.2.2
+      - run: npm --version
+      - run: npm ci --ignore-scripts
+      - run: npm run build --if-present
+      - name: Reach the allowed hosts
+        run: |
+          git ls-remote origin HEAD
+          curl -sSf -o /dev/null https://api.github.com/zen
+          npm view @nodesecure/js-x-ray version
+          curl -sS -o /dev/null -w '%{http_code}\n' https://fulcio.sigstore.dev/api/v2/configuration
+          curl -sS -o /dev/null -w '%{http_code}\n' https://rekor.sigstore.dev/api/v1/log
+      - name: A host off the list is blocked
+        run: |
+          if curl -sS --max-time 15 -o /dev/null https://example.com; then echo "example.com was reachable"; exit 1; fi
+          echo "blocked as expected"
