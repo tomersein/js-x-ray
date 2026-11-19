@@ -31,9 +31,11 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build --if-present
       - name: Reach the allowed hosts
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git ls-remote origin HEAD
-          curl -sSf -o /dev/null https://api.github.com/zen
+          gh api /repos/${{ github.repository }} --jq .full_name
           npm view @nodesecure/js-x-ray version
           curl -sS -o /dev/null -w '%{http_code}\n' https://fulcio.sigstore.dev/api/v2/configuration
           curl -sS -o /dev/null -w '%{http_code}\n' https://rekor.sigstore.dev/api/v1/log
